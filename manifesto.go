@@ -2,6 +2,7 @@ package manifesto
 
 import (
 	"errors"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -138,7 +139,23 @@ func ParseFile(filename string, spec any, status any) *Manifest {
 		log.Fatal("Error during unmarshal file: ", err)
 	}
 
-	err = manifest.Spec.Decode(spec)
+	return parseManifest(&manifest, spec, status)
+}
+
+// ParseReader parses JSON/YAML data from an io.ReadCloser into a Manifest.
+func ParseReader(r io.ReadCloser, spec any, status any) *Manifest {
+	var manifest manifest
+	err := yaml.NewDecoder(r).Decode(&manifest)
+
+	if err != nil {
+		log.Fatal("Error during unmarshal data: ", err)
+	}
+
+	return parseManifest(&manifest, spec, status)
+}
+
+func parseManifest(manifest *manifest, spec any, status any) *Manifest {
+	err := manifest.Spec.Decode(spec)
 	if err != nil {
 		log.Fatal("Error during unmarshal spec: ", err)
 	}

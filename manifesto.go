@@ -1,11 +1,9 @@
 package manifesto
 
 import (
-	"errors"
 	"io"
 	"log"
 	"os"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -128,18 +126,7 @@ func ParseFile(filename string, spec any, status any) *Manifest {
 		log.Fatal("Error when opening file: ", err)
 	}
 
-	var manifest manifest
-	if strings.HasSuffix(filename, ".json") || strings.HasSuffix(filename, ".yaml") || strings.HasSuffix(filename, ".yml") {
-		err = yaml.Unmarshal(content, &manifest)
-	} else {
-		err = errors.New("unknown file type (must be .json, .yaml, .yml): " + filename)
-	}
-
-	if err != nil {
-		log.Fatal("Error during unmarshal file: ", err)
-	}
-
-	return parseManifest(&manifest, spec, status)
+	return ParseBytes(content, spec, status)
 }
 
 // ParseReader parses JSON/YAML data from an io.ReadCloser into a Manifest.
@@ -149,6 +136,23 @@ func ParseReader(r io.ReadCloser, spec any, status any) *Manifest {
 
 	if err != nil {
 		log.Fatal("Error during unmarshal data: ", err)
+	}
+
+	return parseManifest(&manifest, spec, status)
+}
+
+// ParseString parses JSON/YAML data from a string into a Manifest.
+func ParseString(s string, spec any, status any) *Manifest {
+	return ParseBytes([]byte(s), spec, status)
+}
+
+// ParseBytes parses JSON/YAML data from a byte slice into a Manifest.
+func ParseBytes(b []byte, spec any, status any) *Manifest {
+	var manifest manifest
+	err := yaml.Unmarshal(b, &manifest)
+
+	if err != nil {
+		log.Fatal("Error during unmarshal string: ", err)
 	}
 
 	return parseManifest(&manifest, spec, status)

@@ -65,7 +65,7 @@ type Metadata struct {
 	Name string `yaml:"name" json:"name"`
 
 	// Labels is a key-value dictionary for storing any additional data.
-	Labels map[string]string
+	Labels map[string]string `yaml:"labels" json:"labels"`
 }
 
 // Listener is a function that is called when a manifest has been changed.

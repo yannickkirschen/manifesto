@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/yannickkirschen/manifesto"
 )
@@ -12,6 +13,7 @@ type MySpec struct {
 
 func MyListener(action manifesto.Action, manifest *manifesto.Manifest) error {
 	if manifest.ApiVersion != "example.com/v1alpha1" || manifest.Kind != "MyManifest" {
+		log.Printf("Unknown API Version and kind: %s/%s", manifest.ApiVersion, manifest.Kind)
 		return nil
 	}
 
@@ -36,6 +38,7 @@ func main() {
 	pool.Listen(MyListener)
 	pool.Apply(m)
 
-	m3 := pool.GetByKey(m.CreateKey())
+	m3, _ := pool.GetByKey(m.CreateKey())
+	m3.Error("Houston, we have a problem!")
 	pool.Delete(m3.CreateKey())
 }

@@ -23,6 +23,7 @@ type manifest struct {
 	Metadata   Metadata  `yaml:"metadata" json:"metadata"`
 	Spec       yaml.Node `yaml:"spec" json:"spec"`
 	Status     yaml.Node `yaml:"status" json:"status"`
+	Errors     []string  `yaml:"errors,omitempty" json:"errors,omitempty"`
 }
 
 // Manifest is the root entity.
@@ -45,6 +46,9 @@ type Manifest struct {
 	// Status holds status information. Developers must provide their own struct
 	// to be used as Status.
 	Status any `yaml:"status" json:"status"`
+
+	// Errors contains errors that occurred while handling the manifest.
+	Errors []string `yaml:"errors,omitempty" json:"errors,omitempty"`
 }
 
 // CreateKey created a new ManifestKey based on the ApiVersion and Kind.
@@ -52,11 +56,21 @@ func (manifest *Manifest) CreateKey() ManifestKey {
 	return ManifestKey{manifest.ApiVersion, manifest.Kind, manifest.Metadata.Name}
 }
 
+// Error adds an error message to the list of errors.
+func (manifest *Manifest) Error(message string) {
+	manifest.Errors = append(manifest.Errors, message)
+}
+
 // ManifestKey is a primary key for manifests.
 type ManifestKey struct {
 	ApiVersion string
 	Kind       string
 	Name       string
+}
+
+// NewManifestKey creates a new key based on the parameters.
+func NewManifestKey(apiVersion string, kind string, name string) *ManifestKey {
+	return &ManifestKey{apiVersion, kind, name}
 }
 
 // Metadata contains all additional information on a manifest.
@@ -124,8 +138,9 @@ func (pool *Pool) Delete(key ManifestKey) {
 }
 
 // GetByKey searches for a manifest and returns it.
-func (pool *Pool) GetByKey(key ManifestKey) *Manifest {
-	return pool.manifests[key]
+func (pool *Pool) GetByKey(key ManifestKey) (*Manifest, bool) {
+	manifest, ok := pool.manifests[key]
+	return manifest, ok
 }
 
 // ParseFile reads a JSON/YAML file and returns the parsed Manifest.
@@ -184,5 +199,6 @@ func parseManifest(manifest *manifest, spec any, status any) *Manifest {
 		Metadata:   manifest.Metadata,
 		Spec:       spec,
 		Status:     status,
+		Errors:     manifest.Errors,
 	}
 }

@@ -93,16 +93,16 @@ func (pool *Pool) Apply(manifest *Manifest) []error {
 
 	errors := make([]error, 0)
 	if _, ok := pool.manifests[key]; ok {
+		pool.manifests[key] = manifest
 		for _, listener := range pool.listeners {
-			pool.manifests[key] = manifest
 			err := listener(Updated, manifest)
 			if err != nil {
 				errors = append(errors, err)
 			}
 		}
 	} else {
+		pool.manifests[key] = manifest
 		for _, listener := range pool.listeners {
-			pool.manifests[key] = manifest
 			err := listener(Created, manifest)
 			if err != nil {
 				errors = append(errors, err)

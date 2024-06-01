@@ -10,9 +10,9 @@ type MySpec struct {
 	Message string `yaml:"message" json:"message"`
 }
 
-func MyListener(action manifesto.Action, manifest *manifesto.Manifest) {
+func MyListener(action manifesto.Action, manifest *manifesto.Manifest) error {
 	if manifest.ApiVersion != "example.com/v1alpha1" || manifest.Kind != "MyManifest" {
-		return
+		return nil
 	}
 
 	spec := manifest.Spec.(*MySpec)
@@ -25,6 +25,8 @@ func MyListener(action manifesto.Action, manifest *manifesto.Manifest) {
 	case manifesto.Deleted:
 		fmt.Println("Deleted:", spec.Message)
 	}
+
+	return nil
 }
 
 func main() {

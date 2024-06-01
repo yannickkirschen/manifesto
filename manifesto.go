@@ -69,7 +69,7 @@ type Metadata struct {
 }
 
 // Listener is a function that is called when a manifest has been changed.
-type Listener func(Action, *Manifest)
+type Listener func(Action, *Manifest) error
 
 // Pool holds all manifests and listeners.
 type Pool struct {
@@ -88,20 +88,29 @@ func (pool *Pool) Listen(listener Listener) {
 }
 
 // Apply add or updates the manifest to or in the pool and calls all listeners.
-func (pool *Pool) Apply(manifest *Manifest) {
+func (pool *Pool) Apply(manifest *Manifest) []error {
 	key := manifest.CreateKey()
 
+	errors := make([]error, 0)
 	if _, ok := pool.manifests[key]; ok {
 		for _, listener := range pool.listeners {
 			pool.manifests[key] = manifest
-			listener(Updated, manifest)
+			err := listener(Updated, manifest)
+			if err != nil {
+				errors = append(errors, err)
+			}
 		}
 	} else {
 		for _, listener := range pool.listeners {
 			pool.manifests[key] = manifest
-			listener(Created, manifest)
+			err := listener(Created, manifest)
+			if err != nil {
+				errors = append(errors, err)
+			}
 		}
 	}
+
+	return errors
 }
 
 // Delete deletes a manifest from the pool.

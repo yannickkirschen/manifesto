@@ -143,6 +143,17 @@ func (pool *Pool) GetByKey(key ManifestKey) (*Manifest, bool) {
 	return manifest, ok
 }
 
+// Find goes through all existing manifests and filters for a testing function.
+func (pool *Pool) Find(test func(*Manifest) bool) []*Manifest {
+	manifests := make([]*Manifest, 0)
+	for _, manifest := range pool.manifests {
+		if test(manifest) {
+			manifests = append(manifests, manifest)
+		}
+	}
+	return manifests
+}
+
 // ParseFile reads a JSON/YAML file and returns the parsed Manifest.
 func ParseFile(filename string, spec any, status any) *Manifest {
 	content, err := os.ReadFile(filename)

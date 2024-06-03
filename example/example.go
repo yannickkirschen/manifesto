@@ -32,13 +32,13 @@ func MyListener(action manifesto.Action, manifest *manifesto.Manifest) error {
 }
 
 func main() {
-	m := manifesto.ParseFile("example/my-manifest.yaml", &MySpec{}, &MySpec{})
+	m1 := manifesto.ParseFile("example/my-manifest-1.yaml", &MySpec{}, &MySpec{})
 
 	pool := manifesto.CreatePool()
 	pool.Listen(MyListener)
-	pool.Apply(m)
+	pool.Apply(m1)
 
-	m3, _ := pool.GetByKey(m.CreateKey())
+	m3, _ := pool.GetByKey(m1.CreateKey())
 	m3.Error("Houston, we have a problem!")
 	pool.Delete(m3.CreateKey())
 }

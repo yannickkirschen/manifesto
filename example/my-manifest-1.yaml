@@ -2,7 +2,7 @@ apiVersion: example.com/v1alpha1
 kind: MyManifest
 
 metadata:
-  name: my-manifest
+  name: my-manifest-1
 
 spec:
   message: hello, world

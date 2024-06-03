@@ -1,0 +1,8 @@
+apiVersion: example.com/v1alpha1
+kind: MyManifest
+
+metadata:
+  name: my-manifest-2
+
+spec:
+  message: bye, world

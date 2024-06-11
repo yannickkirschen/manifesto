@@ -1,9 +1,11 @@
 package manifesto
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -52,8 +54,8 @@ type Manifest struct {
 }
 
 // CreateKey created a new ManifestKey based on the ApiVersion and Kind.
-func (manifest *Manifest) CreateKey() ManifestKey {
-	return ManifestKey{manifest.ApiVersion, manifest.Kind, manifest.Metadata.Name}
+func (manifest *Manifest) CreateKey() *ManifestKey {
+	return &ManifestKey{manifest.ApiVersion, manifest.Kind, manifest.Metadata.Name}
 }
 
 // Error adds an error message to the list of errors.
@@ -83,17 +85,21 @@ type Metadata struct {
 }
 
 // Listener is a function that is called when a manifest has been changed.
-type Listener func(Action, *Manifest) error
+type Listener func(*Pool, Action, Manifest)
 
 // Pool holds all manifests and listeners.
 type Pool struct {
-	manifests map[ManifestKey]*Manifest
+	manifests map[ManifestKey]Manifest
 	listeners []Listener
+	wg        sync.WaitGroup
 }
 
 // CreatePool creates an empty Pool.
 func CreatePool() *Pool {
-	return &Pool{make(map[ManifestKey]*Manifest), make([]Listener, 0)}
+	return &Pool{
+		manifests: make(map[ManifestKey]Manifest),
+		listeners: make([]Listener, 0),
+	}
 }
 
 // Listen add a listener to the pool.
@@ -101,57 +107,98 @@ func (pool *Pool) Listen(listener Listener) {
 	pool.listeners = append(pool.listeners, listener)
 }
 
-// Apply add or updates the manifest to or in the pool and calls all listeners.
-func (pool *Pool) Apply(manifest *Manifest) []error {
+// Apply adds or updates the manifest to or in the pool and calls all listeners.
+// The manifest is transferred as value, not as reference. By doing so, we
+// prevent race conditions.
+func (pool *Pool) Apply(manifest Manifest) {
 	key := manifest.CreateKey()
 
-	errors := make([]error, 0)
-	if _, ok := pool.manifests[key]; ok {
-		pool.manifests[key] = manifest
+	if _, ok := pool.manifests[*key]; ok {
+		pool.manifests[*key] = manifest
 		for _, listener := range pool.listeners {
-			err := listener(Updated, manifest)
-			if err != nil {
-				errors = append(errors, err)
+			pool.apply(listener, Updated, &manifest)
+		}
+	} else {
+		pool.manifests[*key] = manifest
+		for _, listener := range pool.listeners {
+			pool.apply(listener, Created, &manifest)
+		}
+	}
+}
+
+// ApplyPartial adds or updates the manifest to or in the pool and calls all
+// listeners except the specified one. This is meant to be used when a listener
+// changes a manifest and should not be called again for that change (that could
+// result in an endless loop). The manifest is transferred as value, not as
+// reference. By doing so, we prevent race conditions.
+func (pool *Pool) ApplyPartial(except Listener, manifest Manifest) {
+	key := manifest.CreateKey()
+	exceptName := fmt.Sprintf("%v", except)
+
+	if _, ok := pool.manifests[*key]; ok {
+		pool.manifests[*key] = manifest
+		for _, listener := range pool.listeners {
+			if fmt.Sprintf("%v", listener) != exceptName {
+				pool.apply(listener, Updated, &manifest)
 			}
 		}
 	} else {
-		pool.manifests[key] = manifest
+		pool.manifests[*key] = manifest
 		for _, listener := range pool.listeners {
-			err := listener(Created, manifest)
-			if err != nil {
-				errors = append(errors, err)
-			}
+			pool.apply(listener, Created, &manifest)
 		}
 	}
+}
 
-	return errors
+// ApplySilent adds or updates the manifest to or in the pool WITHOUT calling
+// the listeners. This function is especially useful when using Manifesto just
+// as a simple database without listeners.
+func (pool *Pool) ApplySilent(manifest Manifest) {
+	pool.manifests[*manifest.CreateKey()] = manifest
+}
+
+func (pool *Pool) apply(listener Listener, action Action, manifest *Manifest) {
+	pool.wg.Add(1)
+	go func(listener Listener) {
+		defer pool.wg.Done()
+		listener(pool, action, *manifest)
+	}(listener)
 }
 
 // Delete deletes a manifest from the pool.
-func (pool *Pool) Delete(key ManifestKey) {
-	if manifest, ok := pool.manifests[key]; ok {
-		delete(pool.manifests, key)
+func (pool *Pool) Delete(key *ManifestKey) {
+	if manifest, ok := pool.manifests[*key]; ok {
+		delete(pool.manifests, *key)
 		for _, listener := range pool.listeners {
-			listener(Deleted, manifest)
+			pool.wg.Add(1)
+			go func(listener Listener) {
+				defer pool.wg.Done()
+				listener(pool, Deleted, manifest)
+			}(listener)
 		}
 	}
 }
 
 // GetByKey searches for a manifest and returns it.
-func (pool *Pool) GetByKey(key ManifestKey) (*Manifest, bool) {
-	manifest, ok := pool.manifests[key]
+func (pool *Pool) GetByKey(key *ManifestKey) (Manifest, bool) {
+	manifest, ok := pool.manifests[*key]
 	return manifest, ok
 }
 
 // Find goes through all existing manifests and filters for a testing function.
-func (pool *Pool) Find(test func(*Manifest) bool) []*Manifest {
-	manifests := make([]*Manifest, 0)
+func (pool *Pool) Find(test func(Manifest) bool) []Manifest {
+	manifests := make([]Manifest, 0)
 	for _, manifest := range pool.manifests {
 		if test(manifest) {
 			manifests = append(manifests, manifest)
 		}
 	}
 	return manifests
+}
+
+// Waits till all listeners have completed their work.
+func (pool *Pool) Wait() {
+	pool.wg.Wait()
 }
 
 // ParseFile reads a JSON/YAML file and returns the parsed Manifest.

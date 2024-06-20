@@ -42,7 +42,7 @@ func HandleManifest(path string, pool *Pool, spec any, status any) {
 }
 
 // SendManifest sends a manifest to a given endpoint (blocking) and returns the new manifest.
-func SendManifestSilent(endpoint string, manifest *Manifest, userAgent string) (*Manifest, error) {
+func SendManifest(endpoint string, manifest *Manifest, userAgent string) (*Manifest, error) {
 	b, err := json.Marshal(manifest)
 	if err != nil {
 		return nil, err

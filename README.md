@@ -11,11 +11,11 @@ just like Kubernetes with its resources and operators.
 > [!WARNING]
 > This project is currently under heavy development and not stable.
 
-## Example usage
+## Loading Manifests
+
+Let's define an explanatory manifest in `examples/my-manifest-1.yaml`:
 
 ```yaml
-# example/my-manifest.yaml
-
 apiVersion: example.com/v1alpha1
 kind: MyManifest
 
@@ -26,31 +26,51 @@ spec:
   message: hello, world
 ```
 
-```go
-import "github.com/yannickkirschen/manifesto"
+We want to parse this manifest in a structure we have defined as:
 
+```go
 type MySpec struct {
     Message string `yaml:"message" json:"message"`
 }
+```
 
-func MyListener(pool *manifesto.Pool, action manifesto.Action, manifest manifesto.Manifest) {
-    // Do something with manifesto
-}
+There are two different ways of parsing, as described as follows.
 
-func main() {
-    manifest := manifesto.ParseFile("example/my-manifest-1.yaml", &MySpec{}, &MySpec{})
-    spec :=  manifest.Spec.(*MySpec) // Do something with spec
+### Parsing with static type declaration
 
-    pool := manifesto.CreatePool()
-    pool.Listen(MyListener)
+When parsing, we define what type we expect for the spec and status field:
 
-    pool.Apply(manifest)                     // Calls all listeners
-    pool.ApplyPartial(MyListener, *manifest) // Calls all listeners, except the specified one
-    pool.ApplySilent(*manifest)              // Does not call any listener at all
+```go
+manifest := manifesto.ParseFile("examples/my-manifest-1.yaml", &MySpec{}, &MySpec{})
+// Do something with manifest
+```
 
-    key := manifesto.CreateKey()          // Based on apiVersion and kind
-    theManifest, ok := pool.GetByKey(key) // Get the manifest and check existence
+### Parsing with dynamic type declaration
 
-    pool.Delete(key) // Gets ignored if the key does not exist
-}
+Before parsing, we register a type for the spec and status field that should be
+applied for a API version / Kind combination:
+
+```go
+manifesto.RegisterType("example.com/v1alpha1", "MyManifest", MySpec{}, MySpec{})
+manifest := manifesto.AutoParseFile("examples/my-manifest-1.yaml")
+// Do something with manifest
+```
+
+It is a good pattern to define type associations in the `init` function of a
+package.
+
+## Using a Manifest Pool
+
+```go
+pool := manifesto.CreatePool()
+pool.Listen(MyListener)
+
+pool.Apply(manifest)                     // Calls all listeners
+pool.ApplyPartial(MyListener, *manifest) // Calls all listeners, except the specified one
+pool.ApplySilent(*manifest)              // Does not call any listener at all
+
+key := manifesto.CreateKey()          // Based on apiVersion and kind
+theManifest, ok := pool.GetByKey(key) // Get the manifest and check existence
+
+pool.Delete(key) // Gets ignored if the key does not exist
 ```

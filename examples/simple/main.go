@@ -30,7 +30,7 @@ func MyListener(_ *manifesto.Pool, action manifesto.Action, manifest manifesto.M
 }
 
 func main() {
-	m1 := manifesto.ParseFile("example/my-manifest-1.yaml", &MySpec{}, &MySpec{})
+	m1 := manifesto.ParseFile("examples/my-manifest-1.yaml", &MySpec{}, &MySpec{})
 
 	pool := manifesto.CreatePool()
 	pool.Listen(MyListener)
